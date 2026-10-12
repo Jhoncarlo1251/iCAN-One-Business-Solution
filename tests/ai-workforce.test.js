@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const root = new URL('../', import.meta.url);
+const read = (p) => readFileSync(new URL(p, root), 'utf8');
+test('AI Workforce has eight specialized roles and is mounted behind authenticated route middleware', () => {
+  const route = read('src/routes/ai-workforce.js');
+  const server = read('src/server.js');
+  assert.match(route, /router\.use\(requireAuth\)/);
+  assert.match(route, /workspace_members/);
+  assert.match(route, /chief_of_staff/);
+  assert.match(route, /finance_analyst/);
+  assert.match(route, /sales_crm/);
+  assert.match(route, /operations_inventory/);
+  assert.match(route, /project_manager/);
+  assert.match(route, /business_intelligence/);
+  assert.match(server, /app\.use\('\/api\/ai', aiWorkforceRoutes\)/);
+});
+test('Mistral credentials stay server-side and AI route does not execute actions', () => {
+  const route = read('src/routes/ai-workforce.js');
+  const client = read('src/api-client.js');
+  const ui = read('src/app.js');
+  assert.match(route, /process\.env\.MISTRAL_API_KEY/);
+  assert.match(route, /actionsExecuted: false/);
+  assert.match(route, /perform actions/i);
+  assert.doesNotMatch(client, /MISTRAL_API_KEY\s*=/);
+  assert.match(client, /askAIRole/);
+  assert.match(ui, /AI Workforce/);
+  assert.match(ui, /ask-ai-role/);
+});

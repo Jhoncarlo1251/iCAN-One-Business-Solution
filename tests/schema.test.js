@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const schema=readFileSync(new URL('../db/schema.sql',import.meta.url),'utf8');
+const server=readFileSync(new URL('../src/server.js',import.meta.url),'utf8');
+const route=(name)=>readFileSync(new URL(`../src/routes/${name}.js`,import.meta.url),'utf8');
+test('schema includes core identity, inventory, WMS and POS tables',()=>{for(const table of ['users','workspaces','workspace_members','tasks','products','warehouses','warehouse_locations','inventory_balances','inventory_movements','sales','sale_items','audit_events'])assert.match(schema,new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\b`),`missing ${table}`);});
+test('server mounts core API routes',()=>{for(const path of ['/api/auth','/api/tasks','/api/products','/api/inventory','/api/sales','/api/warehouses'])assert.ok(server.includes(`'${path}'`),`missing route ${path}`);});
+test('checkout validates idempotency, role and stock before recording sale',()=>{const s=route('sales');assert.match(s,/idempotencyKey/);assert.match(s,/FOR UPDATE/);assert.match(s,/available<item\.quantity/);assert.match(s,/sale\.completed/);});
+test('inventory adjustments require idempotency and reject negative stock',()=>{const s=route('inventory');assert.match(s,/idempotencyKey/);assert.match(s,/after<0/);assert.match(s,/inventory\.adjusted/);});
+test('catalog writes are workspace-scoped and role-gated',()=>{const s=route('products');assert.match(s,/workspace_id=\$1/);assert.match(s,/owner','admin','manager/);});

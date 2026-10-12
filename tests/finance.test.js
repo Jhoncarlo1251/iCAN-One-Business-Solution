@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+const root=process.cwd();
+test('finance routes are mounted behind authenticated API router and persist expenses',()=>{const server=fs.readFileSync(path.join(root,'src/server.js'),'utf8');const route=fs.readFileSync(path.join(root,'src/routes/finance.js'),'utf8');assert.match(server,/financeRoutes/);assert.match(server,/app\.use\('\/api', financeRoutes\)/);assert.match(route,/router\.use\(requireAuth\)/);assert.match(route,/INSERT INTO expenses/);assert.match(route,/audit_events/);assert.match(route,/Workspace access denied/);});
+test('finance migration creates workspace-scoped positive expenses with status and indexes',()=>{const sql=fs.readFileSync(path.join(root,'db/migrations/004_finance_foundation.sql'),'utf8');assert.match(sql,/workspace_id UUID NOT NULL REFERENCES workspaces/);assert.match(sql,/CHECK \(amount > 0\)/);assert.match(sql,/status IN \('posted','voided'\)/);assert.match(sql,/expenses_workspace_date_idx/);});
+test('business loader pulls persistent expenses and management summary',()=>{const client=fs.readFileSync(path.join(root,'src/api-client.js'),'utf8');assert.match(client,/\/api\/expenses\?workspaceId=/);assert.match(client,/\/api\/finance\/summary\?workspaceId=/);assert.match(client,/async function createExpense/);});
+
+test('purchase-order cancellation is transactional, audited, and restricted to unreceived orders',()=>{const route=fs.readFileSync(path.join(root,'src/routes/crm-purchasing.js'),'utf8');assert.match(route,/purchase-orders\/:id\/cancel/);assert.match(route,/FOR UPDATE/);assert.match(route,/Only an unreceived ordered purchase order can be cancelled/);assert.match(route,/A purchase order with received quantities cannot be cancelled/);assert.match(route,/purchasing\.order_cancelled/);const app=fs.readFileSync(path.join(root,'src/app.js'),'utf8');assert.match(app,/cancel-purchase-order/);});
+test('expense creation uses PostgreSQL when connected and retains clearly labeled demo fallback',()=>{const app=fs.readFileSync(path.join(root,'src/app.js'),'utf8');assert.match(app,/icanBackend\.createExpense\(d\)/);assert.match(app,/Expense added locally; demo only/);});
